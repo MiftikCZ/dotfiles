@@ -1,0 +1,182 @@
+#!/bin/bash
+#ver=2
+
+# PINGUIN: Arch's lightweight Aur helper made by MiftikCZ
+
+action=$1
+package=$2
+
+HUE="36"
+CYAN="\033[1;0;${HUE}m"
+CYAN_BOLD="\033[1;1;${HUE}m"
+BOLD="\033[1;255m"
+RESET=$(tput sgr0)
+SEL="$CYAN_BOLD::$RESET$BOLD"
+SELIN="$CYAN_BOLD>>$RESET$BOLD"
+SELINL="$CYAN_BOLD>$RESET$BOLD"
+
+HELPCOMMAND=" ${CYAN_BOLD} -I ${RESET}Install ${CYAN_BOLD} -R ${RESET}Remove ${CYAN_BOLD} -U ${RESET}Update ${CYAN_BOLD} -AR ${RESET}AutoRemove ${CYAN_BOLD} -A ${RESET}AUR ${CYAN_BOLD} -AC ${RESET}autoclean (Clean cache)"
+
+if [ $action ]; then
+    printf ""
+else
+    echo -e "${SEL} Usage $RESET"
+    echo -e $HELPCOMMAND
+    exit 
+fi
+
+
+function_update () {
+    echo -e "$SEL Running: sudo pacman -Syu"
+    sudo pacman -Syu
+    echo -e "$SEL DONE! $RESET"
+    exit
+}
+
+function_autoremove() {
+    echo -e "$SEL COMMAND: pacman -R \$(pacman -Qtdq)"
+    printf "$SELIN Remove unused packages [y/N] $SELINL$RESET "
+    read showinfo
+    if [ "$showinfo" = "y" ]; then
+        sudo pacman -R $(pacman -Qtdq)
+        echo -e "$SEL Now running update"
+        sudo pacman -Syu
+    fi
+    echo -e "$SEL DONE! $RESET"
+    exit
+}
+
+
+
+if [ $action = "-I" ]; then
+    action="install"
+elif [ $action = "-R" ]; then
+    action="remove"
+elif [ $action = "-U" ]; then
+    action="update"
+elif [ $action = "-RU" ]; then
+    action="autoremove"
+elif [ $action = "-AC" ]; then
+    action="autoclean"
+elif [ $action = "-RC" ]; then
+    action="autoclean"
+elif [ $action = "-AR" ]; then
+    action="autoremove"
+elif [ $action = "-A" ]; then
+    action="aur"
+fi
+
+
+if [ $action = "install" ]; then
+    action="install"
+elif [ $action = "remove" ]; then
+    action="remove"
+elif [ $action = "autoclean" ]; then
+    sudo pacman -Sc
+elif [ $action = "update" ]; then
+    action="update"
+    function_update
+elif [ $action = "autoremove" ]; then
+    function_autoremove
+elif [ $action = "aur" ]; then
+    action="aur"
+else 
+    echo "Action not found..."
+    echo -e "${CYAN_BOLD}USAGE:${RESET} $HELPCOMMAND"
+    exit
+fi
+
+if [ $package ]; then
+    echo -e "The package: $package"
+else
+    echo "No package defined"
+    echo -e "${CYAN_BOLD}USAGE:${RESET} pinguin ${action} [package]"
+    exit 
+fi
+
+
+case "${action}" in
+    "aur" )
+        printf "$SELIN Import $package from AUR with git [Y/n] $SELINL$RESET "
+        read importgit
+        if [ "$importgit" = "n" ]; then
+            echo -e "$SEL Got NO, continuing $RESET"
+        else
+            git clone https://aur.archlinux.org/${package}.git
+            cd ${package}
+        fi
+
+        printf "$SELIN Remove temporary dependencies after install ? [Y/n] $SELINL$RESET "
+        read removetemp
+        if [ "$removetemp" = "n" ]; then
+            # makepkg -si
+            echo -e "$SEL Running: makepkg -si"
+            makepkg -si
+        else
+            # makepkg -sircC
+            echo -e "$SEL Running: makepkg -sircC"
+            makepkg -sircC
+        fi
+        echo -e "$SEL COMPLETED $RESET"
+        exit
+     ;;
+	"install" )
+		# echo -e "$SEL ? $RESET"
+        printf "$SELIN Update sources [y/N] $SELINL$RESET "
+        read showinfo
+        if [ "$showinfo" = "y" ]; then
+            sudo pacman -Sy
+        fi
+
+
+
+        printf "$SELIN Show alternatives [y/N] $SELINL$RESET "
+        read findalternatives
+        if [ "$findalternatives" = "y" ]; then
+            pacman -Ss $package
+        fi
+
+        printf "$SELIN Show info [y/N] $SELINL$RESET "
+        read showinfo
+        if [ "$showinfo" = "y" ]; then
+            pacman -Si $package
+        fi
+
+        printf "$SELIN Install [Y/n] $SELINL$RESET "
+        read showinfo
+        if [ "$showinfo" = "n" ]; then
+            echo -e "$SEL Ok exiting... $RESET"
+            exit
+        else
+            echo -e "$SEL Running: sudo pacman -${arg} ${package}"
+            sudo pacman -S $package
+        fi
+
+
+        echo -e "$SEL COMPLETED $RESET"
+    ;;
+	"remove" )
+        echo "" 
+        echo -e "$SEL${CYAN_BOLD} Purge dependencies? $RESET (and config files)"
+        echo -e "     ${CYAN_BOLD} Y) ${RESET}Purge  ${CYAN_BOLD} N) ${RESET}Skip"
+        echo ""
+        printf "$SELIN Choose [Y/n] $SELINL$RESET "
+		read removedepends
+
+        arg="Rcsnu"
+        if [ "$removedepends" = "n" ]; then
+            echo "Got NO: using -R"
+            arg="R"
+        else
+            echo "Got YES: using -Rcsnu"
+            arg="Rcsnu"
+        fi
+
+        echo -e "$SEL Running: sudo pacman -${arg} ${package}"
+        sudo pacman -${arg} ${package}
+
+        echo ""
+        echo -e "$SEL COMPLETED $RESET"
+    ;;
+esac
+
